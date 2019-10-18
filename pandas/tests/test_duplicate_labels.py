@@ -249,7 +249,7 @@ class TestRaises:
     )
     def test_construction_with_duplicates(self, cls, axes):
         result = cls(**axes)
-        assert result._allows_duplicate_labels is True
+        assert result.allows_duplicate_labels is True
 
         with pytest.raises(pandas.errors.DuplicateLabelError):
             cls(**axes, allow_duplicate_labels=False)

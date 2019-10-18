@@ -1,4 +1,4 @@
-""""
+"""
 DataFrame
 ---------
 An efficient 2D container for potentially mixed-type time series or other
@@ -2791,7 +2791,8 @@ class DataFrame(NDFrame):
                 index=self.columns,
                 name=self.index[i],
                 dtype=new_values.dtype,
-            ).__finalize__(self, method="ixs")
+            )
+            result.__finalize__(self, method="ixs")
             result._set_is_copy(self, copy=copy)
             return result
 
@@ -5314,8 +5315,9 @@ class DataFrame(NDFrame):
             with np.errstate(all="ignore"):
                 res_values = _arith_op(this.values, other.values)
             new_data = dispatch_fill_zeros(func, this.values, other.values, res_values)
-        # XXX: pass them here.
-        return this._construct_result(new_data)
+        result = this._construct_result(new_data)
+        result.__finalize__((self, other), method="combine_frame")
+        return result
 
     def _combine_match_index(self, other, func):
         # at this point we have `self.index.equals(other.index)`

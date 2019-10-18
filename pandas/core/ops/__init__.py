@@ -624,7 +624,9 @@ def _combine_series_frame(self, other, func, fill_value=None, axis=None, level=N
     else:
         new_data = dispatch_to_series(left, right, func, axis="columns")
 
-    return left._construct_result(new_data)
+    result = left._construct_result(new_data)
+    result.__finalize__((self, other), method="combine_series_frame")
+    return result
 
 
 def _align_method_FRAME(left, right, axis):
@@ -724,7 +726,9 @@ def _arith_method_FRAME(cls, op, special):
                 self = self.fillna(fill_value)
 
             new_data = dispatch_to_series(self, other, op)
-            return self._construct_result(new_data)
+            result = self._construct_result(new_data)
+            result.__finalize__(self)
+            return result
 
     f.__name__ = op_name
 

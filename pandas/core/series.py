@@ -1795,7 +1795,8 @@ class Series(base.IndexOpsMixin, generic.NDFrame):
         else:
             df = self._constructor_expanddim({name: self})
 
-        return df.__finalize__(self)
+        df.__finalize__(self)
+        return df
 
     def _set_name(self, name, inplace=False):
         """

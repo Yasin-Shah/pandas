@@ -242,9 +242,9 @@ class SeriesGroupBy(GroupBy):
                 raise TypeError(no_arg_message)
 
         if isinstance(func, str):
-            return getattr(self, func)(*args, **kwargs).__finalize__(
-                method="groupby-aggregate"
-            )
+            result = getattr(self, func)(*args, **kwargs)
+            result.__finalize__(self, method="groupby-aggregate")
+            return result
 
         if isinstance(func, abc.Iterable):
             # Catch instances of lists / tuples
@@ -275,12 +275,16 @@ class SeriesGroupBy(GroupBy):
             print("Warning, ignoring as_index=True")
 
         # _level handled at higher
-        if not _level and isinstance(ret, dict):
+        if not _level and isinstance(ret, (dict, OrderedDict)):
             from pandas import concat
 
             ret = concat(ret, axis=1)
 
-        return ret.__finalize__(self, method="groupby-aggregate")
+        if isinstance(ret, NDFrame):
+            # TODO: when is this *not* an NDFrame?
+            # pandas/tests/resample/test_resample_api.py::test_agg_nested_dicts
+            ret = ret.__finalize__(self, method="groupby-aggregate")
+        return ret
 
     agg = aggregate
 
@@ -876,6 +880,7 @@ class DataFrameGroupBy(GroupBy):
 
         result, how = self._aggregate(func, _level=_level, *args, **kwargs)
         if how is None:
+            result.__finalize__(self, method="groupby-aggregate")
             return result
 
         if result is None:

@@ -169,14 +169,6 @@ class DuplicateLabelError(ValueError):
     """
 
 
-class NullFrequencyError(ValueError):
-    """
-    Error raised when a null `freq` attribute is used in an operation
-    that needs a non-null frequency, particularly `DatetimeIndex.shift`,
-    `TimedeltaIndex.shift`, `PeriodIndex.shift`.
-    """
-
-
 class AccessorRegistrationWarning(Warning):
     """Warning for attribute conflicts in accessor registration."""
 

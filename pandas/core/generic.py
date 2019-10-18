@@ -187,7 +187,7 @@ class NDFrame(PandasObject, SelectionMixin):
             "ix",
         ]
     )  # type: FrozenSet[str]
-    _metadata = ["allows_duplicate_labels"]  # type: List[str]
+    _metadata = []  # type: List[str]
     _is_copy = None
     _data = None  # type: BlockManager
 
@@ -224,12 +224,16 @@ class NDFrame(PandasObject, SelectionMixin):
         object.__setattr__(self, "_is_copy", None)
         object.__setattr__(self, "_data", data)
         object.__setattr__(self, "_item_cache", {})
-        object.__setattr__(self, "allows_duplicate_labels", allow_duplicate_labels)
         if attrs is None:
             attrs = {}
         else:
             attrs = dict(attrs)
+        # need to add it to the dict here, since NDFrame.__setattr__
+        # also calls NDFrame.__getattr__...
+        # attrs['allows_duplicate_labels'] = allow_duplicate_labels
         object.__setattr__(self, "_attrs", attrs)
+        object.__setattr__(self, "allows_duplicate_labels", allow_duplicate_labels)
+        # self.allows_duplicate_labels = allow_duplicate_labels
 
     def _init_mgr(self, mgr, axes=None, dtype=None, copy=False):
         """ passed a manager and a axes dict """
@@ -251,21 +255,6 @@ class NDFrame(PandasObject, SelectionMixin):
     # ----------------------------------------------------------------------
 
     @property
-    def allows_duplicate_labels(self):
-        """
-        Whether this object allows duplicate labels.
-        """
-        return self._allows_duplicate_labels
-
-    @allows_duplicate_labels.setter
-    def allows_duplicate_labels(self, value: bool):
-        value = bool(value)
-        if not value:
-            for ax in self.axes:
-                ax._maybe_check_unique()
-
-        self._allows_duplicate_labels = value
-
     def attrs(self) -> Dict[Hashable, Any]:
         """
         Dictionary of global attributes on this object.
@@ -277,6 +266,22 @@ class NDFrame(PandasObject, SelectionMixin):
     @attrs.setter
     def attrs(self, value: Mapping[Hashable, Any]) -> None:
         self._attrs = dict(value)
+
+    @property
+    def allows_duplicate_labels(self) -> bool:
+        """
+        Whether this object allows duplicate labels.
+        """
+        return self.attrs["allows_duplicate_labels"]
+
+    @allows_duplicate_labels.setter
+    def allows_duplicate_labels(self, value: bool):
+        value = bool(value)
+        if not value:
+            for ax in self.axes:
+                ax._maybe_check_unique()
+
+        self.attrs["allows_duplicate_labels"] = value
 
     @property
     def is_copy(self):
@@ -3655,7 +3660,8 @@ class NDFrame(PandasObject, SelectionMixin):
                 index=self.columns,
                 name=self.index[loc],
                 dtype=new_values.dtype,
-            ).__finalize__(self, method="xs")
+            )
+            result.__finalize__(self, method="xs")
 
         else:
             result = self.iloc[loc]
@@ -5276,18 +5282,18 @@ class NDFrame(PandasObject, SelectionMixin):
 
         duplicate_labels = "allows_duplicate_labels"
 
-        # import pdb; pdb.set_trace()
         if isinstance(other, NDFrame):
-            for name in other.attrs:
-                self.attrs[name] = other.attrs[name]
+            for name, value in other.attrs.items():
+                # Need to think about this...
+                if name == "allows_duplicate_labels":
+                    self.allows_duplicate_labels = value
+                elif name in self.attrs:
+                    self.attrs[name] = other.attrs[name]
+
             # For subclasses using _metadata.
             for name in self._metadata:
-                if name == "name" and getattr(other, "ndim", None) == 1:
-                    # Calling hasattr(other, 'name') is bad for DataFrames with
-                    # a name column.
-                    object.__setattr__(self, name, getattr(other, name, None))
-                elif name != "name":
-                    object.__setattr__(self, name, getattr(other, name, None))
+                object.__setattr__(self, name, getattr(other, name, None))
+
         elif method == "concat":
             assert isinstance(other, _Concatenator)
             self.allows_duplicate_labels = merge_all(other.objs, duplicate_labels)
@@ -5296,7 +5302,7 @@ class NDFrame(PandasObject, SelectionMixin):
             self.allows_duplicate_labels = merge_all(
                 (other.left, other.right), duplicate_labels
             )
-        elif method in {"combine_const", "combine_frame"}:
+        elif method in {"combine_const", "combine_frame", "combine_series_frame"}:
             assert isinstance(other, tuple)
             self.allows_duplicate_labels = merge_all(other, duplicate_labels)
         elif method == "align_series":
@@ -9078,10 +9084,9 @@ class NDFrame(PandasObject, SelectionMixin):
                         right.index = join_index
 
         # TODO: Determine the expected behavior here. Should these affect eachother?
-        return (
-            left.__finalize__((self, other), method="align_series"),
-            right.__finalize__((other, self), method="align_series"),
-        )
+        left.__finalize__((self, other), method="align_series")
+        right.__finalize__((other, self), method="align_series")
+        return left, right
 
     def _where(
         self,
@@ -10032,7 +10037,9 @@ class NDFrame(PandasObject, SelectionMixin):
         2    6   30  -30
         3    7   40  -50
         """
-        return np.abs(self).__finalize__(self)
+        result = np.abs(self)
+        result.__finalize__(self)
+        return result
 
     def describe(self, percentiles=None, include=None, exclude=None):
         """

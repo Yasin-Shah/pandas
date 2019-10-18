@@ -330,11 +330,9 @@ class _Window(PandasObject, SelectionMixin):
 
         if not len(final):
             return obj.astype("float64")
-        return (
-            concat(final, axis=1)
-            .reindex(columns=columns, copy=False)
-            .__finalize__(self, method="window")
-        )
+        result = concat(final, axis=1).reindex(columns=columns, copy=False)
+        result.__finalize__(self, method="window")
+        return result
 
     def _center_window(self, result, window) -> np.ndarray:
         """
