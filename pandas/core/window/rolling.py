@@ -298,7 +298,7 @@ class _Window(PandasObject, SelectionMixin):
 
             result = self._wrap_result(result, block=block, obj=obj)
             if result.ndim == 1:
-                return result
+                return result.__finalize__(self, method="window")
             final.append(result)
 
         # if we have an 'on' column
@@ -330,7 +330,11 @@ class _Window(PandasObject, SelectionMixin):
 
         if not len(final):
             return obj.astype("float64")
-        return concat(final, axis=1).reindex(columns=columns, copy=False)
+        return (
+            concat(final, axis=1)
+            .reindex(columns=columns, copy=False)
+            .__finalize__(self, method="window")
+        )
 
     def _center_window(self, result, window) -> np.ndarray:
         """

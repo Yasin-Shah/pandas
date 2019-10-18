@@ -71,6 +71,7 @@ See the :ref:`overview` for more detail about what's in the library.
   * :doc:`user_guide/reshaping`
   * :doc:`user_guide/text`
   * :doc:`user_guide/missing_data`
+  * :doc:`user_guide/duplicates`
   * :doc:`user_guide/categorical`
   * :doc:`user_guide/integer_na`
   * :doc:`user_guide/visualization`

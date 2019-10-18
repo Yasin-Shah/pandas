@@ -155,6 +155,28 @@ class MergeError(ValueError):
     """
 
 
+class DuplicateLabelError(ValueError):
+    """
+    Error raised when an operation would introduce duplicate labels.
+
+    Examples
+    --------
+    >>> s = pd.Series([0, 1, 2], index=['a', 'b', 'c'], allows_duplicates=False)
+    >>> s.reindex(['a', 'a', 'b'])
+    Traceback (most recent call last):
+       ...
+    DuplicateLabelError: Duplicate labels are not allowed on this pandas object.
+    """
+
+
+class NullFrequencyError(ValueError):
+    """
+    Error raised when a null `freq` attribute is used in an operation
+    that needs a non-null frequency, particularly `DatetimeIndex.shift`,
+    `TimedeltaIndex.shift`, `PeriodIndex.shift`.
+    """
+
+
 class AccessorRegistrationWarning(Warning):
     """Warning for attribute conflicts in accessor registration."""
 

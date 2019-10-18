@@ -242,7 +242,9 @@ class SeriesGroupBy(GroupBy):
                 raise TypeError(no_arg_message)
 
         if isinstance(func, str):
-            return getattr(self, func)(*args, **kwargs)
+            return getattr(self, func)(*args, **kwargs).__finalize__(
+                method="groupby-aggregate"
+            )
 
         if isinstance(func, abc.Iterable):
             # Catch instances of lists / tuples
@@ -277,7 +279,8 @@ class SeriesGroupBy(GroupBy):
             from pandas import concat
 
             ret = concat(ret, axis=1)
-        return ret
+
+        return ret.__finalize__(self, method="groupby-aggregate")
 
     agg = aggregate
 

@@ -22,6 +22,7 @@ Attributes
    :toctree: api/
 
    Series.index
+   Series.allows_duplicate_labels
 
 .. autosummary::
    :toctree: api/

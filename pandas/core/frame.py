@@ -1,4 +1,4 @@
-"""
+""""
 DataFrame
 ---------
 An efficient 2D container for potentially mixed-type time series or other
@@ -338,6 +338,13 @@ class DataFrame(NDFrame):
         Data type to force. Only a single dtype is allowed. If None, infer.
     copy : bool, default False
         Copy data from inputs. Only affects DataFrame / 2d ndarray input.
+    allow_duplicate_labels : bool, default True
+        Whether to allow duplicate row or column labels in this DataFrame.
+        By default, duplicte labels are permitted. Setting this to ``False``
+        will cause an :class:`errors.DuplicateLabelError` to be raised when
+        `index` or `columns` are not unique, or when any subsequent operation
+        on this DataFrame introduces duplicates. See :ref:`duplictes.disallow`
+        for more.
 
     See Also
     --------
@@ -407,6 +414,7 @@ class DataFrame(NDFrame):
         columns: Optional[Axes] = None,
         dtype: Optional[Dtype] = None,
         copy: bool = False,
+        allow_duplicate_labels: bool = True,
     ):
         if data is None:
             data = {}
@@ -497,7 +505,9 @@ class DataFrame(NDFrame):
             else:
                 raise ValueError("DataFrame constructor not properly called!")
 
-        NDFrame.__init__(self, mgr, fastpath=True)
+        NDFrame.__init__(
+            self, mgr, fastpath=True, allow_duplicate_labels=allow_duplicate_labels
+        )
 
     # ----------------------------------------------------------------------
 
@@ -2768,6 +2778,8 @@ class DataFrame(NDFrame):
         If slice passed, the resulting data will be a view.
         """
         # irow
+        # TODO: Figure out if this is the right place to finalize.
+        #   Does it make sense to do here, or higher-level (like `LocationIndexer`)?
         if axis == 0:
             label = self.index[i]
             new_values = self._data.fast_xs(i)
@@ -2779,7 +2791,7 @@ class DataFrame(NDFrame):
                 index=self.columns,
                 name=self.index[i],
                 dtype=new_values.dtype,
-            )
+            ).__finalize__(self, method="ixs")
             result._set_is_copy(self, copy=copy)
             return result
 
@@ -2796,6 +2808,8 @@ class DataFrame(NDFrame):
             if len(self.index) and not len(values):
                 values = np.array([np.nan] * len(self.index), dtype=object)
             result = self._box_col_values(values, label)
+            if isinstance(result, NDFrame):
+                result.__finalize__(self, method="ixs")
 
             # this is a cached value, mark it so
             result._set_as_cached(label, self)
@@ -2857,6 +2871,8 @@ class DataFrame(NDFrame):
             if data.shape[1] == 1 and not isinstance(self.columns, ABCMultiIndex):
                 data = data[key]
 
+        if isinstance(data, NDFrame):
+            data.__finalize__(self, method="dataframe_getitem")
         return data
 
     def _getitem_bool_array(self, key):
@@ -5298,6 +5314,7 @@ class DataFrame(NDFrame):
             with np.errstate(all="ignore"):
                 res_values = _arith_op(this.values, other.values)
             new_data = dispatch_fill_zeros(func, this.values, other.values, res_values)
+        # XXX: pass them here.
         return this._construct_result(new_data)
 
     def _combine_match_index(self, other, func):

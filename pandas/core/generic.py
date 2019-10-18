@@ -166,6 +166,7 @@ class NDFrame(PandasObject, SelectionMixin):
         "_default_kind",
         "_default_fill_value",
         "_metadata",
+        "_allows_duplicate_labels",
         "__array_struct__",
         "__array_interface__",
     ]  # type: List[str]
@@ -186,7 +187,7 @@ class NDFrame(PandasObject, SelectionMixin):
             "ix",
         ]
     )  # type: FrozenSet[str]
-    _metadata = []  # type: List[str]
+    _metadata = ["allows_duplicate_labels"]  # type: List[str]
     _is_copy = None
     _data = None  # type: BlockManager
 
@@ -205,6 +206,7 @@ class NDFrame(PandasObject, SelectionMixin):
         axes: Optional[List[Index]] = None,
         copy: bool = False,
         dtype: Optional[Dtype] = None,
+        allow_duplicate_labels: bool = True,
         attrs: Optional[Mapping[Hashable, Any]] = None,
         fastpath: bool = False,
     ):
@@ -222,6 +224,7 @@ class NDFrame(PandasObject, SelectionMixin):
         object.__setattr__(self, "_is_copy", None)
         object.__setattr__(self, "_data", data)
         object.__setattr__(self, "_item_cache", {})
+        object.__setattr__(self, "allows_duplicate_labels", allow_duplicate_labels)
         if attrs is None:
             attrs = {}
         else:
@@ -248,6 +251,21 @@ class NDFrame(PandasObject, SelectionMixin):
     # ----------------------------------------------------------------------
 
     @property
+    def allows_duplicate_labels(self):
+        """
+        Whether this object allows duplicate labels.
+        """
+        return self._allows_duplicate_labels
+
+    @allows_duplicate_labels.setter
+    def allows_duplicate_labels(self, value: bool):
+        value = bool(value)
+        if not value:
+            for ax in self.axes:
+                ax._maybe_check_unique()
+
+        self._allows_duplicate_labels = value
+
     def attrs(self) -> Dict[Hashable, Any]:
         """
         Dictionary of global attributes on this object.
@@ -3637,11 +3655,13 @@ class NDFrame(PandasObject, SelectionMixin):
                 index=self.columns,
                 name=self.index[loc],
                 dtype=new_values.dtype,
-            )
+            ).__finalize__(self, method="xs")
 
         else:
             result = self.iloc[loc]
             result.index = new_index
+            # TODO: ensure test for this branch
+            result.__finalize__(self)
 
         # this could be a view
         # but only in a single-dtyped view sliceable case
@@ -3660,6 +3680,13 @@ class NDFrame(PandasObject, SelectionMixin):
         if res is None:
             values = self._data.get(item)
             res = self._box_item_values(item, values)
+            if isinstance(res, NDFrame):
+                # TODO: this caching may cause issues. e.g.
+                # >>> df = pd.DataFrame({"A": [0]}, allows_duplicate_labels=False)
+                # >>> df['A']
+                # >>> df.allows_duplicate_labels = True
+                # >>> df['A']
+                res.__finalize__(self)
             cache[item] = res
             res._set_as_cached(item, self)
 
@@ -5236,12 +5263,51 @@ class NDFrame(PandasObject, SelectionMixin):
             types of propagation actions based on this
 
         """
+        from pandas.core.reshape.concat import _Concatenator
+        from pandas.core.reshape.merge import _MergeOperation
+
+        def merge_all(objs, name, default=True):
+            return all(getattr(x, name, default) for x in objs)
+
+        def finalize_name(objs):
+            names = {x.name for x in objs if x.name is not None}
+            if len(names) == 1:
+                return list(names)[0]
+
+        duplicate_labels = "allows_duplicate_labels"
+
+        # import pdb; pdb.set_trace()
         if isinstance(other, NDFrame):
             for name in other.attrs:
                 self.attrs[name] = other.attrs[name]
             # For subclasses using _metadata.
             for name in self._metadata:
-                object.__setattr__(self, name, getattr(other, name, None))
+                if name == "name" and getattr(other, "ndim", None) == 1:
+                    # Calling hasattr(other, 'name') is bad for DataFrames with
+                    # a name column.
+                    object.__setattr__(self, name, getattr(other, name, None))
+                elif name != "name":
+                    object.__setattr__(self, name, getattr(other, name, None))
+        elif method == "concat":
+            assert isinstance(other, _Concatenator)
+            self.allows_duplicate_labels = merge_all(other.objs, duplicate_labels)
+        elif method == "merge":
+            assert isinstance(other, _MergeOperation)
+            self.allows_duplicate_labels = merge_all(
+                (other.left, other.right), duplicate_labels
+            )
+        elif method in {"combine_const", "combine_frame"}:
+            assert isinstance(other, tuple)
+            self.allows_duplicate_labels = merge_all(other, duplicate_labels)
+        elif method == "align_series":
+            assert isinstance(other, tuple)
+            self.allows_duplicate_labels = merge_all(other, duplicate_labels)
+            if self.ndim == 1:
+                # apparently called with DataFrame too
+                self.name = other[0].name
+        elif method in {"groupby-aggregate", "window"}:
+            self.allows_duplicate_labels = other.obj.allows_duplicate_labels
+
         return self
 
     def __getattr__(self, name):
@@ -9011,7 +9077,11 @@ class NDFrame(PandasObject, SelectionMixin):
                         left.index = join_index
                         right.index = join_index
 
-        return left.__finalize__(self), right.__finalize__(other)
+        # TODO: Determine the expected behavior here. Should these affect eachother?
+        return (
+            left.__finalize__((self, other), method="align_series"),
+            right.__finalize__((other, self), method="align_series"),
+        )
 
     def _where(
         self,
@@ -9962,7 +10032,7 @@ class NDFrame(PandasObject, SelectionMixin):
         2    6   30  -30
         3    7   40  -50
         """
-        return np.abs(self)
+        return np.abs(self).__finalize__(self)
 
     def describe(self, percentiles=None, include=None, exclude=None):
         """

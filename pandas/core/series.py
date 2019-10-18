@@ -171,6 +171,12 @@ class Series(base.IndexOpsMixin, generic.NDFrame):
         See the :ref:`user guide <basics.dtypes>` for more usages.
     copy : bool, default False
         Copy input data.
+    allow_duplicate_labels : bool, default True
+        Whether to allow duplicate labels in this Series. By default,
+        duplicte labels are permitted. Setting this to ``False`` will
+        cause an :class:`errors.DuplicateLabelError` to be raised when
+        `index` is not unique, or any subsequent operation on this Series
+        introduces duplicates. See :ref:`duplictes.disallow` for more.
     """
 
     _metadata = []  # type: List[str]
@@ -203,7 +209,14 @@ class Series(base.IndexOpsMixin, generic.NDFrame):
     # Constructors
 
     def __init__(
-        self, data=None, index=None, dtype=None, name=None, copy=False, fastpath=False
+        self,
+        data=None,
+        index=None,
+        dtype=None,
+        name=None,
+        copy=False,
+        allow_duplicate_labels=True,
+        fastpath=False,
     ):
 
         # we are called internally, so short-circuit
@@ -323,7 +336,10 @@ class Series(base.IndexOpsMixin, generic.NDFrame):
 
                 data = SingleBlockManager(data, index, fastpath=True)
 
-        generic.NDFrame.__init__(self, data, fastpath=True)
+        generic.NDFrame.__init__(
+            self, data, allow_duplicate_labels=allow_duplicate_labels, fastpath=True
+        )
+
         self.name = name
         self._set_axis(0, index, fastpath=True)
 
@@ -1779,7 +1795,7 @@ class Series(base.IndexOpsMixin, generic.NDFrame):
         else:
             df = self._constructor_expanddim({name: self})
 
-        return df
+        return df.__finalize__(self)
 
     def _set_name(self, name, inplace=False):
         """

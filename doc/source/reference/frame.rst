@@ -23,6 +23,7 @@ Attributes and underlying data
 
    DataFrame.index
    DataFrame.columns
+   DataFrame.allows_duplicate_labels
 
 .. autosummary::
    :toctree: api/
