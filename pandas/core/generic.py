@@ -2125,6 +2125,9 @@ class NDFrame(PandasObject, SelectionMixin):
             self._unpickle_matrix_compat(state)
 
         self._item_cache = {}
+        # This isn't hit by tests, only the v0.8.0 whatsnew.
+        if not hasattr(self, "_attrs"):
+            object.__setattr__(self, "_attrs", {})
 
     # ----------------------------------------------------------------------
     # Rendering Methods
