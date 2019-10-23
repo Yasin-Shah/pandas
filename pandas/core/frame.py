@@ -764,6 +764,7 @@ class DataFrame(NDFrame):
         decimal: str = ".",
         line_width: Optional[int] = None,
         max_colwidth: Optional[int] = None,
+        encoding: Optional[str] = None,
     ) -> Optional[str]:
         """
         Render a DataFrame to a console-friendly tabular output.
@@ -774,6 +775,10 @@ class DataFrame(NDFrame):
             Max width to truncate each column in characters. By default, no limit.
 
             .. versionadded:: 1.0.0
+        encoding : str, default "utf-8"
+            Set character encoding.
+
+            .. versionadded:: 1.0
         %(returns)s
         See Also
         --------
@@ -812,7 +817,7 @@ class DataFrame(NDFrame):
                 decimal=decimal,
                 line_width=line_width,
             )
-            return formatter.to_string(buf=buf)
+            return formatter.to_string(buf=buf, encoding=encoding)
 
     # ----------------------------------------------------------------------
 
@@ -881,7 +886,7 @@ class DataFrame(NDFrame):
         """
 
     @Appender(_shared_docs["items"])
-    def items(self) -> Iterable[Tuple[Hashable, Series]]:
+    def items(self) -> Iterable[Tuple[Optional[Hashable], Series]]:
         if self.columns.is_unique and hasattr(self, "_item_cache"):
             for k in self.columns:
                 yield k, self._get_item_cache(k)
