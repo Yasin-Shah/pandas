@@ -94,6 +94,44 @@ of the Series or columns of a DataFrame will also have string dtype.
 We recommend explicitly using the ``string`` data type when working with strings.
 See :ref:`text.types` for more.
 
+.. _whatsnew_100.duplicates:
+
+Ensuring unique labels
+~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`Series` and :class:`DataFrame` now accept a keyword to control whether
+duplicate labels are allowed (:issue:`27108`). By default, duplicates are allowed (which is
+compatible with previous versions of pandas).
+
+.. ipython:: python
+   :okexcept:
+
+   pd.Series([1, 2], index=['a', 'a'], allow_duplicate_labels=False)
+
+The property may be checked
+
+.. ipython:: python
+
+   s = pd.Series([0, 1], index=['a', 'A'], allow_duplicate_labels=True)
+   s.allows_duplicate_labels
+
+And updated
+
+.. ipython:: python
+
+   s.allows_duplicate_labels = False
+
+The property persists through most pandas operations. If an operation introduces
+duplicate labels, an exception is raise.
+
+.. ipython:: python
+   :okexcept:
+
+   s.rename(index=lambda x: x.upper())
+
+See :ref:`duplicates` for more
+
+
 .. _whatsnew_1000.enhancements.other:
 
 Other enhancements
@@ -410,7 +448,7 @@ Other
 - Trying to set the ``display.precision``, ``display.max_rows`` or ``display.max_columns`` using :meth:`set_option` to anything but a ``None`` or a positive int will raise a ``ValueError`` (:issue:`23348`)
 - Using :meth:`DataFrame.replace` with overlapping keys in a nested dictionary will no longer raise, now matching the behavior of a flat dictionary (:issue:`27660`)
 - :meth:`DataFrame.to_csv` and :meth:`Series.to_csv` now support dicts as ``compression`` argument with key ``'method'`` being the compression method and others as additional compression options when the compression method is ``'zip'``. (:issue:`26023`)
-- Metadata is now finalized for the following methods on ``Series`` and ``DataFrame`` (:issue:``)
+- Metadata is now finalized for the following methods on ``Series`` and ``DataFrame`` (:issue:`28394`)
    * :meth:`~DataFrame.abs`
    * :meth:`Series.to_frame`
 - Bug in :meth:`Series.diff` where a boolean series would incorrectly raise a ``TypeError`` (:issue:`17294`)
